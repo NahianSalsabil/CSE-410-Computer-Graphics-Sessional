@@ -8,6 +8,7 @@ using namespace std;
 
 double cameraHeight;
 double cameraAngle;
+double camera_pos_value;
 int drawgrid;
 int drawaxes;
 
@@ -15,7 +16,7 @@ int drawaxes;
 double wheel_radius;
 double wheel_slices;
 double depth;
-double camera_pos_value;
+
 
 double rec_width;
 double rec_length;
@@ -294,11 +295,12 @@ void init(){
 
     cameraAngle = 1;
     cameraHeight = 150;
+	camera_pos_value = 200;
 
     wheel_radius = 40;
     wheel_slices = 30;
     depth = 16;
-    camera_pos_value = 200;
+    
 
     rec_width = depth/2;
     rec_length = 2*wheel_radius;
