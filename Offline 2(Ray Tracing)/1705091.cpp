@@ -17,8 +17,9 @@ struct Triangle{
     color Color;
 };
 
-//=======//
+//==================//
 
+//=========== For stage 1 ============//
 vector<vector<double>> Matrix_multiply(vector<vector<double>> top_matrix, vector<vector<double>> input_matrix){
     vector<vector<double>> mult_matrix(4);
     for(int i = 0; i < 4; i++)
@@ -117,6 +118,63 @@ vector<vector<double>> make_vector(vector<double> a, double rotation_angle){
     return rotation_matrix;
 }
 
+void print_matrix(vector<vector<double>> points){
+    for(int i = 0; i < 4; i++){
+        for(int j = 0; j < 4; j++){
+            cout << setprecision(7) << points[i][j] << " ";
+        }
+        cout << endl;
+    }
+}
+
+//=================//
+
+
+//========== For stage 4 =================//
+int findMaxY(Triangle triangle){
+    if(triangle.Points[0].y > triangle.Points[1].y){
+        if(triangle.Points[0].y > triangle.Points[2].y) return 0;
+        else    return 2;
+    }
+    else{
+        if(triangle.Points[1].y > triangle.Points[2].y) return 1;
+        else    return 2;
+    }
+}
+
+int findMinY(Triangle triangle){
+    if(triangle.Points[0].y < triangle.Points[1].y){
+        if(triangle.Points[0].y < triangle.Points[2].y) return 0;
+        else    return 2;
+    }
+    else{
+        if(triangle.Points[1].y < triangle.Points[2].y) return 1;
+        else    return 2;
+    }
+}
+
+int findMaxX(Triangle triangle){
+    if(triangle.Points[0].x > triangle.Points[1].x){
+        if(triangle.Points[0].x > triangle.Points[2].x) return 0;
+        else    return 2;
+    }
+    else{
+        if(triangle.Points[1].x > triangle.Points[2].x) return 1;
+        else    return 2;
+    }
+}
+
+int findMinX(Triangle triangle){
+    if(triangle.Points[0].x < triangle.Points[1].x){
+        if(triangle.Points[0].x < triangle.Points[2].x) return 0;
+        else    return 2;
+    }
+    else{
+        if(triangle.Points[1].x < triangle.Points[2].x) return 1;
+        else    return 2;
+    }
+}
+
 void print_triangle(vector<vector<double>> output_Point, int dimension){
     // cout << "triangle new point: \n"; 
     for(int i = 0; i < dimension; i++){
@@ -128,14 +186,7 @@ void print_triangle(vector<vector<double>> output_Point, int dimension){
     }
 }
 
-void print_matrix(vector<vector<double>> points){
-    for(int i = 0; i < 4; i++){
-        for(int j = 0; j < 4; j++){
-            cout << setprecision(7) << points[i][j] << " ";
-        }
-        cout << endl;
-    }
-}
+
 
 int main(){
     //================================ Modeling Transformation ================================//
@@ -152,11 +203,6 @@ int main(){
     cin >> look.x >> look.y >> look.z;
     cin >> up.x >> up.y >> up.z;
     cin >> fovY >> aspectratio >> near >> far;
-
-    // cout << eye.x << " " << eye.y << " " << eye.z << endl;
-    // cout << look.x << " " << look.y << " " << look.z << endl;
-    // cout << up.x << " " << up.y << " " << up.z << endl;
-    // cout << fovY << " " << aspectratio << " " << near << " " << far << endl;
 
     stack<vector<vector<double>>> S;
     stack<int> pushed_count;
@@ -442,19 +488,21 @@ int main(){
     //===========================Clipping and Scan Conversion Using z buffer=============================//
     // Read File
     freopen("config.txt", "r", stdin);
-    freopen("output.txt", "w", stdout);
+    freopen("z_buffer.txt", "w", stdout);
 
     double screen_width, screen_height, left_lim_x, right_lim_x, bottom_lim_y, top_lim_y, front_limit, rear_limit;
 
     cin >> screen_width >> screen_height >> left_lim_x >> bottom_lim_y >> front_limit >> rear_limit;
     right_lim_x = -left_lim_x;
-    bottom_lim_y = -top_lim_y;
+    top_lim_y = -bottom_lim_y;
 
     fclose(stdin);
     freopen("stage3.txt", "r", stdin);
 
     struct Triangle triangles[triangle_count];
     input_triangle = 0;
+
+    
     while(input_triangle < triangle_count){
         cin >> triangles[input_triangle].Points[0].x >> triangles[input_triangle].Points[0].y >> triangles[input_triangle].Points[0].z;
         cin >> triangles[input_triangle].Points[1].x >> triangles[input_triangle].Points[1].y >> triangles[input_triangle].Points[1].z;
@@ -466,7 +514,7 @@ int main(){
 
         input_triangle++;
     }
-    // input_triangle = 0;
+    input_triangle = 0;
     // while(input_triangle < triangle_count){
     //     cout << triangles[input_triangle].Points[0].x << " " << triangles[input_triangle].Points[0].y << " " << triangles[input_triangle].Points[0].z << endl;
     //     cout << triangles[input_triangle].Points[1].x << " " << triangles[input_triangle].Points[1].y << " " << triangles[input_triangle].Points[1].z << endl;
@@ -478,7 +526,7 @@ int main(){
 
     //     input_triangle++;
     // }
-
+    
     // Initialize frame buffer with background color and z buffer with max z;
     vector<vector<double>> z_buffer(screen_width);
     vector<vector<color>> frame_buffer(screen_width);
@@ -502,6 +550,103 @@ int main(){
     double dy = (top_lim_y - bottom_lim_y) / screen_height;
     double Top_y = top_lim_y - (dy/2);
     double Left_x = left_lim_x + (dx/2);
+
+    for(int i = 0; i < triangle_count; i++){
+        
+        // top scanline
+        int ret_topy_index = findMaxY(triangles[i]);
+            // clipping along y axis
+        double top_scan_y = triangles[i].Points[ret_topy_index].y > top_lim_y ? top_lim_y : (triangles[i].Points[ret_topy_index].y < bottom_lim_y ? 0 : triangles[i].Points[ret_topy_index].y);
+        int top_scanline = floor((Top_y - top_scan_y) / dy);
+
+        // bottom scanline
+        int ret_bottomy_index = findMinY(triangles[i]);
+            // clipping along y axis
+        double bottom_scan_y = triangles[i].Points[ret_bottomy_index].y < bottom_lim_y ? bottom_lim_y : (triangles[i].Points[ret_bottomy_index].y > top_lim_y ? 0: triangles[i].Points[ret_bottomy_index].y);
+        int bottom_scanline = floor((Top_y - bottom_scan_y) / dy);
+
+        // leftmost x
+        int ret_leftx_index = findMinX(triangles[i]);
+        double leftmost_x = triangles[i].Points[ret_leftx_index].x;
+
+        //rightmost x
+        int ret_right_index = findMaxX(triangles[i]);
+        double rightmost_x = triangles[i].Points[ret_right_index].x;
+
+        // x1 and y1
+        double x1 = triangles[i].Points[ret_topy_index].x;    // top point x
+        double x2 = triangles[i].Points[ret_bottomy_index].x;
+        double x3 = triangles[i].Points[3-ret_topy_index-ret_bottomy_index].x;
+        double y1 = triangles[i].Points[ret_topy_index].y;    // top point y
+        double y2 = triangles[i].Points[ret_bottomy_index].y;
+        double y3 = triangles[i].Points[3-ret_topy_index-ret_bottomy_index].y;
+        double z1 = triangles[i].Points[ret_topy_index].z;    // top point z
+        double z2 = triangles[i].Points[ret_bottomy_index].z;
+        double z3 = triangles[i].Points[3-ret_topy_index-ret_bottomy_index].z;
+
+        // loop over scanline from top to bottom
+        int top_intersecting_column = (x1 - Left_x) / dx;
+        if(z1 < z_buffer[top_scanline][top_intersecting_column]){
+            z_buffer[top_scanline][top_intersecting_column] = z1;
+            //frame_buffer[top_scanline][top_intersecting_column] = triangles[i].Color;
+        }
+
+        for(int j = top_scanline+1; j <= bottom_scanline; j++){
+            double cur_scanline_y = Top_y - (j * dy);
+            // intersecting x value
+            double xa = x1 - ((x1 - x2) * ((y1 - cur_scanline_y) / (y1 - y2)));
+            double xb = x1 - ((x1 - x3) * ((y1 - cur_scanline_y) / (y1 - y3)));
+            double xc = x2 - ((x2 - x3) * ((y2 - cur_scanline_y) / (y2 - y3)));
+            double za = z1 - ((z1 - z2) * ((y1 - cur_scanline_y) / (y1 - y2)));
+            double zb = z1 - ((z1 - z3) * ((y1 - cur_scanline_y) / (y1 - y3)));
+            double zc = z2 - ((z2 - z3) * ((y2 - cur_scanline_y) / (y2 - y3)));
+
+            if(isinf(xa) || xa < leftmost_x || xa > rightmost_x){
+                xa = xc;
+                za = zc;
+            }
+            else if(isinf(xb) || xb < leftmost_x || xb > rightmost_x){
+                xb = xc;
+                zb = zc;
+            }
+
+            // find the leftmost x and rightmost x;
+            double temp = xa;
+            xa = xa < xb ? xa : xb;   // leftmost
+            xb = temp < xb ? xb : temp;   // rightmost
+
+            // Clipping along x axis
+            xa = xa < left_lim_x ? left_lim_x : (xa > right_lim_x ? 0 : xa);
+            xb = xb > right_lim_x ? right_lim_x : (xb < left_lim_x ? 0 : xb); 
+
+            // intersecting columns
+            int left_intersecting_col = floor(abs(xa - Left_x) / dx);
+            int right_intersecting_col = floor(abs(xb - Left_x) / dx);
+          
+            // loop from leftmost x to rightmost x
+            if(za < z_buffer[j][left_intersecting_col])
+                z_buffer[j][left_intersecting_col] = za;
+
+            double zp = z_buffer[j][left_intersecting_col];
+            for(int k = left_intersecting_col+1; k <= right_intersecting_col; k++){
+                // calculating z values
+                zp = zp + (dx * ((zb - za) / (xb - xa)));
+                if(zp < z_buffer[j][k]){
+                    z_buffer[j][k] = zp;
+                }
+            }
+        }
+
+    }
+
+    // Save Z buffer into file
+    for(int i = 0; i < screen_width; i++){
+        for(int j = 0; j < screen_height; j++){
+            if(z_buffer[i][j] < rear_limit)
+                cout << fixed << setprecision(6) << z_buffer[i][j] << "\t";
+        }
+        cout << endl;
+    }
 
 
 
