@@ -1,4 +1,5 @@
 #include<bits/stdc++.h>
+#include "bitmap_image.hpp"
 using namespace std;
 
 double pi = 2*acos(0.0);
@@ -36,86 +37,19 @@ vector<vector<double>> Matrix_multiply(vector<vector<double>> top_matrix, vector
     return mult_matrix;
 }
 
-vector<double> R(vector<double> i, vector<double> a, vector<double> sina, double rotation_angle){
-    vector<double> part1(3);
-    for(int m = 0; m < 3; m++){
-        part1[m] = cos(rotation_angle*pi/180) * i[m];
-    }
+point Rodrigues(point x, point a, double rotation_angle){
+    double cosa = cos((rotation_angle*pi) / 180);
+    double sina = sin((rotation_angle*pi) / 180);
 
-    vector<double> part2(3);
-    for(int m = 0; m < 3; m++){
-        part2[m] = (1 - cos(rotation_angle*pi/180)) * a[m];
-    }
+    point part1 = {cosa * x.x, cosa * x.y, cosa * x.z};
 
-    vector<double> part3(3);
-    for(int m = 0; m < 3; m++){
-        part3[m] = sin(rotation_angle*pi/180)*sina[m];
-    }
+    double first_part2 = (1 - cosa) * (x.x * a.x + x.y * a.y + x.z * a.z);
+    point part2 = {first_part2 * a.x, first_part2 * a.y, first_part2 * a.z};
 
-    vector<double> column(3);
-    for(int m = 0; m < 3; m++)
-        column[m] = part1[m] + part2[m] + part3[m];
+    point part3_cross_product = {a.y * x.z - a.z * x.y, a.z * x.x - a.x * x.z, a.x * x.y - a.y * x.x};
+    point part3 = {part3_cross_product.x * sina, part3_cross_product.y * sina, part3_cross_product.z * sina};
 
-    return column;
-}
-
-vector<vector<double>> make_vector(vector<double> a, double rotation_angle){
-    vector<double> i, j, k, ai, aj, ak, sinai, sinaj, sinak;;
-    i.push_back(1);
-    i.push_back(0);
-    i.push_back(0);
-
-    j.push_back(0);
-    j.push_back(1);
-    j.push_back(0);
-
-    k.push_back(0);
-    k.push_back(0);
-    k.push_back(1);
-
-    ai.push_back(a.at(0) * a.at(1));
-    ai.push_back(a.at(0) * a.at(1));
-    ai.push_back(a.at(0) * a.at(2));
-
-    aj.push_back(a.at(0) * a.at(1));
-    aj.push_back(a.at(1) * a.at(1));
-    aj.push_back(a.at(1) * a.at(2));
-
-    ak.push_back(a.at(0) * a.at(2));
-    ak.push_back(a.at(1) * a.at(2));
-    ak.push_back(a.at(2) * a.at(2));
-
-    sinai.push_back(0);
-    sinai.push_back(a.at(2));
-    sinai.push_back(-a.at(1));
-
-    sinaj.push_back(-a.at(2));
-    sinaj.push_back(0);
-    sinaj.push_back(a.at(0));
-
-    sinak.push_back(a.at(1));
-    sinak.push_back(-a.at(0));
-    sinak.push_back(0);
-
-    vector<double> c1 = R(i, ai, sinai, rotation_angle);
-    vector<double> c2 = R(j, aj, sinaj, rotation_angle);
-    vector<double> c3 = R(k, ak, sinak, rotation_angle);
-
-    vector<vector<double>> rotation_matrix(4);
-    for(int m = 0; m < 4; m++){
-        rotation_matrix[m].resize(4);
-    }
-
-    for(int n = 0; n < 4; n++){
-        for(int m = 0; m < 4; m++){
-            if(m == 3 && n == 3) rotation_matrix[m][n] = 1;
-            else if(m == 3 || n == 3) rotation_matrix[m][n] = 0;
-            else if(n == 0) rotation_matrix[m][n] = c1.at(m);
-            else if(n == 1) rotation_matrix[m][n] = c2.at(m);
-            else if(n == 2) rotation_matrix[m][n] = c3.at(m);
-        }
-    }
-    return rotation_matrix;
+    return {part1.x + part2.x + part3.x, part1.y + part2.y + part3.y, part1.z + part2.z + part3.z};
 }
 
 void print_matrix(vector<vector<double>> points){
@@ -180,7 +114,7 @@ void print_triangle(vector<vector<double>> output_Point, int dimension){
     for(int i = 0; i < dimension; i++){
         for(int j = 0; j < dimension; j++){
             if(i != 3 && j != 3)
-                cout << fixed << setprecision(7) << output_Point[j][i]/output_Point[dimension-1][0] << " ";
+                cout << fixed << setprecision(7) << output_Point[j][i]/output_Point[dimension-1][i] << " ";
         }   
         cout << endl;
     }
@@ -288,14 +222,39 @@ int main(){
 
         else if(command == "rotate"){
             double rotation_angle;
-            vector<double> a(3);
-            cin >> rotation_angle >> a[0] >> a[1] >> a[2];
-            double norm = sqrt(pow(a[0],2) + pow(a[1],2) + pow(a[2],2));
-            a[0] /= norm;
-            a[1] /= norm;
-            a[2] /= norm;
+            struct point a;
+            cin >> rotation_angle >> a.x >> a.y >> a.z;
+            double norm = sqrt(pow(a.x,2) + pow(a.y,2) + pow(a.z,2));
+            a.x /= norm;
+            a.y /= norm;
+            a.z /= norm;
+
+            struct point x;
+            x.x = 1; x.y = 0; x.z = 0;
+            struct point c1 = Rodrigues(x, a, rotation_angle);
+
+            x.x = 0; x.y = 1; x.z = 0;
+            struct point c2 = Rodrigues(x, a, rotation_angle);
+
+            x.x = 0; x.y = 0; x.z = 1;
+            struct point c3 = Rodrigues(x, a, rotation_angle);
+
+            vector<vector<double>> rotation_matrix(dimension);
+            for(int i = 0; i < dimension; i++) 
+                rotation_matrix[i].resize(dimension);
             
-            vector<vector<double>> rotation_matrix = make_vector(a, rotation_angle);
+            rotation_matrix[0][0] = c1.x; rotation_matrix[1][0] = c1.y; rotation_matrix[2][0] = c1.z;
+            rotation_matrix[0][1] = c2.x; rotation_matrix[1][1] = c2.y; rotation_matrix[2][1] = c2.z;
+            rotation_matrix[0][2] = c3.x; rotation_matrix[1][2] = c3.y; rotation_matrix[2][2] = c3.z;
+
+            for(int i = 0; i < dimension; i++){
+                for(int j = 0; j < dimension; j++){
+                    if(i == 3 && j == 3) rotation_matrix[i][j] = 1;
+                    else if(i == 3) rotation_matrix[i][j] = 0;
+                    else if(j == 3) rotation_matrix[i][j] = 0;
+                    
+                }
+            }
 
             // cout << "rotation matrix: \n";
             // print_matrix(rotation_matrix);
@@ -437,8 +396,8 @@ int main(){
 
     // Create Projection Matrix
     double fovX = fovY * aspectratio;
-    double t = near * tan((fovY/2) * pi / 180);
-    double projection_r = near * tan((fovX/2) * pi / 180);
+    double t = near * tan(((fovY/2) * pi) / 180);
+    double projection_r = near * tan(((fovX/2) * pi) / 180);
 
     vector<vector<double>> projection_matrix(dimension);
     for(int i = 0; i < dimension; i++)
@@ -552,18 +511,17 @@ int main(){
     double Left_x = left_lim_x + (dx/2);
 
     for(int i = 0; i < triangle_count; i++){
-        
         // top scanline
         int ret_topy_index = findMaxY(triangles[i]);
             // clipping along y axis
         double top_scan_y = triangles[i].Points[ret_topy_index].y > top_lim_y ? top_lim_y : (triangles[i].Points[ret_topy_index].y < bottom_lim_y ? 0 : triangles[i].Points[ret_topy_index].y);
-        int top_scanline = floor((Top_y - top_scan_y) / dy);
+        int top_scanline = round((Top_y - top_scan_y) / dy);
 
         // bottom scanline
         int ret_bottomy_index = findMinY(triangles[i]);
             // clipping along y axis
         double bottom_scan_y = triangles[i].Points[ret_bottomy_index].y < bottom_lim_y ? bottom_lim_y : (triangles[i].Points[ret_bottomy_index].y > top_lim_y ? 0: triangles[i].Points[ret_bottomy_index].y);
-        int bottom_scanline = floor((Top_y - bottom_scan_y) / dy);
+        int bottom_scanline = round((Top_y - bottom_scan_y) / dy);
 
         // leftmost x
         int ret_leftx_index = findMinX(triangles[i]);
@@ -588,7 +546,7 @@ int main(){
         int top_intersecting_column = (x1 - Left_x) / dx;
         if(z1 < z_buffer[top_scanline][top_intersecting_column]){
             z_buffer[top_scanline][top_intersecting_column] = z1;
-            //frame_buffer[top_scanline][top_intersecting_column] = triangles[i].Color;
+            frame_buffer[top_scanline][top_intersecting_column] = triangles[i].Color;
         }
 
         for(int j = top_scanline+1; j <= bottom_scanline; j++){
@@ -620,12 +578,14 @@ int main(){
             xb = xb > right_lim_x ? right_lim_x : (xb < left_lim_x ? 0 : xb); 
 
             // intersecting columns
-            int left_intersecting_col = floor(abs(xa - Left_x) / dx);
-            int right_intersecting_col = floor(abs(xb - Left_x) / dx);
+            int left_intersecting_col = round(abs(xa - Left_x) / dx);
+            int right_intersecting_col = round(abs(xb - Left_x) / dx);
           
             // loop from leftmost x to rightmost x
-            if(za < z_buffer[j][left_intersecting_col])
+            if(za < z_buffer[j][left_intersecting_col]){
                 z_buffer[j][left_intersecting_col] = za;
+                frame_buffer[j][left_intersecting_col] = triangles[i].Color;
+            }
 
             double zp = z_buffer[j][left_intersecting_col];
             for(int k = left_intersecting_col+1; k <= right_intersecting_col; k++){
@@ -633,10 +593,10 @@ int main(){
                 zp = zp + (dx * ((zb - za) / (xb - xa)));
                 if(zp < z_buffer[j][k]){
                     z_buffer[j][k] = zp;
+                    frame_buffer[j][k] = triangles[i].Color;
                 }
             }
         }
-
     }
 
     // Save Z buffer into file
@@ -648,6 +608,16 @@ int main(){
         cout << endl;
     }
 
+    fclose(stdout);
+
+    // Draw Image from frame buffer
+    bitmap_image image(screen_height, screen_width);
+    for(int i = 0; i < screen_width; i++){
+        for(int j = 0; j < screen_height; j++){
+            image.set_pixel(j,i,frame_buffer[i][j].R, frame_buffer[i][j].G,frame_buffer[i][j].B);
+        }
+    }
+    image.save_image("out.bmp");;
 
 
     return 0;
