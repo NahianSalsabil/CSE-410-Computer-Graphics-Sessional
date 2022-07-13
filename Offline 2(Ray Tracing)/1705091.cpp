@@ -2,6 +2,8 @@
 #include "bitmap_image.hpp"
 using namespace std;
 
+#define INF numeric_limits<double>::infinity()
+
 double pi = 2*acos(0.0);
 
 struct point{
@@ -17,7 +19,6 @@ struct Triangle{
     point Points[3];
     color Color;
 };
-
 //==================//
 
 //=========== For stage 1 ============//
@@ -196,9 +197,6 @@ int main(){
                     else translation_matrix[i][j] = 0;
                 }
             }
-
-            // print_matrix(translation_matrix);
-
             S.push(Matrix_multiply(S.top(), translation_matrix));
             if(ispush == 1) count++;
         }
@@ -215,7 +213,6 @@ int main(){
                     else scaling_matrix[i][j] = 0;
                 }
             }
-
             S.push(Matrix_multiply(S.top(), scaling_matrix));
             if(ispush == 1) count++;
         }
@@ -255,9 +252,6 @@ int main(){
                     
                 }
             }
-
-            // cout << "rotation matrix: \n";
-            // print_matrix(rotation_matrix);
             
             S.push(Matrix_multiply(S.top(), rotation_matrix));
             if(ispush == 1) count++;
@@ -280,14 +274,13 @@ int main(){
                 pushed_count.pop();
             }
             else count = 0;
-            
         }
 
         else if(command == "end"){
             break;
         }
     }
-        
+    cin.clear(); 
     
     fclose(stdin);
     fclose(stdout);
@@ -361,7 +354,6 @@ int main(){
 
     // View Transformation
     vector<vector<double>> view_transformation_matrix = Matrix_multiply(rotation_matrix, translation_matrix);
-    // print_matrix(view_transformation_matrix);
 
     int input_triangle = 0;
     while(input_triangle < triangle_count){
@@ -474,17 +466,6 @@ int main(){
         input_triangle++;
     }
     input_triangle = 0;
-    // while(input_triangle < triangle_count){
-    //     cout << triangles[input_triangle].Points[0].x << " " << triangles[input_triangle].Points[0].y << " " << triangles[input_triangle].Points[0].z << endl;
-    //     cout << triangles[input_triangle].Points[1].x << " " << triangles[input_triangle].Points[1].y << " " << triangles[input_triangle].Points[1].z << endl;
-    //     cout << triangles[input_triangle].Points[2].x << " " << triangles[input_triangle].Points[2].y << " " << triangles[input_triangle].Points[2].z << endl;
-
-    //     cout << triangles[input_triangle].Color.R << endl;
-    //     cout << triangles[input_triangle].Color.G << endl;
-    //     cout << triangles[input_triangle].Color.B << endl;
-
-    //     input_triangle++;
-    // }
     
     // Initialize frame buffer with background color and z buffer with max z;
     vector<vector<double>> z_buffer(screen_width);
@@ -528,70 +509,78 @@ int main(){
         double leftmost_x = triangles[i].Points[ret_leftx_index].x;
 
         //rightmost x
-        int ret_right_index = findMaxX(triangles[i]);
-        double rightmost_x = triangles[i].Points[ret_right_index].x;
+        int ret_rightx_index = findMaxX(triangles[i]);
+        double rightmost_x = triangles[i].Points[ret_rightx_index].x;
 
-        // x1 and y1
-        double x1 = triangles[i].Points[ret_topy_index].x;    // top point x
-        double x2 = triangles[i].Points[ret_bottomy_index].x;
-        double x3 = triangles[i].Points[3-ret_topy_index-ret_bottomy_index].x;
-        double y1 = triangles[i].Points[ret_topy_index].y;    // top point y
-        double y2 = triangles[i].Points[ret_bottomy_index].y;
-        double y3 = triangles[i].Points[3-ret_topy_index-ret_bottomy_index].y;
-        double z1 = triangles[i].Points[ret_topy_index].z;    // top point z
-        double z2 = triangles[i].Points[ret_bottomy_index].z;
-        double z3 = triangles[i].Points[3-ret_topy_index-ret_bottomy_index].z;
+        //middle x
+        double middle_x = triangles[i].Points[3-ret_leftx_index-ret_rightx_index].x; 
 
+        //===//
+        double x1 = leftmost_x;
+        double x2 = rightmost_x;
+        double x3 = middle_x;
+        double y1 = triangles[i].Points[ret_leftx_index].y;
+        double y2 = triangles[i].Points[ret_rightx_index].y;
+        double y3 = triangles[i].Points[3-ret_leftx_index-ret_rightx_index].y;
+        double z1 = triangles[i].Points[ret_leftx_index].z;
+        double z2 = triangles[i].Points[ret_rightx_index].z;
+        double z3 = triangles[i].Points[3-ret_leftx_index-ret_rightx_index].z;
+        
         // loop over scanline from top to bottom
-        int top_intersecting_column = (x1 - Left_x) / dx;
-        if(z1 < z_buffer[top_scanline][top_intersecting_column]){
-            z_buffer[top_scanline][top_intersecting_column] = z1;
-            frame_buffer[top_scanline][top_intersecting_column] = triangles[i].Color;
-        }
-
-        for(int j = top_scanline+1; j <= bottom_scanline; j++){
-            double cur_scanline_y = Top_y - (j * dy);
+        for(int j = top_scanline; j <= bottom_scanline; j++){
+            double cur_scanline_y = Top_y - (j * dy);; 
             // intersecting x value
             double xa = x1 - ((x1 - x2) * ((y1 - cur_scanline_y) / (y1 - y2)));
-            double xb = x1 - ((x1 - x3) * ((y1 - cur_scanline_y) / (y1 - y3)));
-            double xc = x2 - ((x2 - x3) * ((y2 - cur_scanline_y) / (y2 - y3)));
             double za = z1 - ((z1 - z2) * ((y1 - cur_scanline_y) / (y1 - y2)));
+            double xb = x1 - ((x1 - x3) * ((y1 - cur_scanline_y) / (y1 - y3)));
             double zb = z1 - ((z1 - z3) * ((y1 - cur_scanline_y) / (y1 - y3)));
+            double xc = x2 - ((x2 - x3) * ((y2 - cur_scanline_y) / (y2 - y3)));
             double zc = z2 - ((z2 - z3) * ((y2 - cur_scanline_y) / (y2 - y3)));
 
-            if(isinf(xa) || xa < leftmost_x || xa > rightmost_x){
+            if(xa != INF && !isnan(xa))
+                if(xa < leftmost_x || xa > rightmost_x) xa = INF;
+            if(xb != INF && !isnan(xb))
+                if(xb < leftmost_x || xb > middle_x) xb = INF;
+            if(xc != INF && !isnan(xc))
+                if(xc < middle_x || xc > rightmost_x) xc = INF;
+
+            if(xa == INF && xb != INF && xc != INF){
                 xa = xc;
                 za = zc;
             }
-            else if(isinf(xb) || xb < leftmost_x || xb > rightmost_x){
+            else if(xb ==  INF && xa != INF && xc != INF){
                 xb = xc;
                 zb = zc;
             }
+            else if((xa == INF && xb == INF) || (xa == INF && xc == INF) || (xb == INF && xc == INF))
+                continue;
 
             // find the leftmost x and rightmost x;
-            double temp = xa;
-            xa = xa < xb ? xa : xb;   // leftmost
-            xb = temp < xb ? xb : temp;   // rightmost
+            double tempx = xa, tempz = za;
+            if(xa > xb){
+                xa = xb;
+                za = zb;
+                xb = tempx;
+                zb = tempz;
+            }
 
             // Clipping along x axis
-            xa = xa < left_lim_x ? left_lim_x : (xa > right_lim_x ? 0 : xa);
-            xb = xb > right_lim_x ? right_lim_x : (xb < left_lim_x ? 0 : xb); 
+            xa = xa < left_lim_x ? left_lim_x : (xa > right_lim_x ? right_lim_x : xa);
+            xb = xb > right_lim_x ? right_lim_x : (xb < left_lim_x ? left_lim_x : xb); 
 
             // intersecting columns
             int left_intersecting_col = round(abs(xa - Left_x) / dx);
             int right_intersecting_col = round(abs(xb - Left_x) / dx);
           
             // loop from leftmost x to rightmost x
-            if(za < z_buffer[j][left_intersecting_col]){
-                z_buffer[j][left_intersecting_col] = za;
-                frame_buffer[j][left_intersecting_col] = triangles[i].Color;
-            }
-
-            double zp = z_buffer[j][left_intersecting_col];
-            for(int k = left_intersecting_col+1; k <= right_intersecting_col; k++){
-                // calculating z values
-                zp = zp + (dx * ((zb - za) / (xb - xa)));
-                if(zp < z_buffer[j][k]){
+            // calculating z values
+            double zp;
+            for(int k = left_intersecting_col; k <= right_intersecting_col; k++){
+                if(k == left_intersecting_col)
+                    zp = za + (((Left_x + left_intersecting_col * dx) - xa) * (zb - za) / (xb - xa));
+                else
+                    zp = zp + (dx * (zb - za) / (xb - xa));
+                if(zp > front_limit && zp < z_buffer[j][k]){
                     z_buffer[j][k] = zp;
                     frame_buffer[j][k] = triangles[i].Color;
                 }
@@ -618,7 +607,6 @@ int main(){
         }
     }
     image.save_image("out.bmp");;
-
 
     return 0;
 }
