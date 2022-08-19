@@ -5,12 +5,8 @@
 
 #define pi (2*acos(0.0))
 
-extern vector <Object*> objects;
-extern vector <PointLight*> pointLights;
-extern vector <SpotLight*> spotLights;
 
 
-int recursion_level;
 int pixel_number;
 int no_of_objects;
 int no_of_pointlight;
@@ -29,7 +25,8 @@ double rotation_angle = pi * rotate_angle / 180;
 double sphere_stacks = 25;
 double sphere_slices = 30;
 
-Vector3D position, l, u, r;
+Vector3D object_pos, l, u, r;
+Vector3D  position;
 
 // for bitmap image
 int windowWidth = 500;
@@ -81,56 +78,60 @@ void Capture(){
 	cout << "captured\n";
 	int imageWidth = pixel_number; int imageHeight = pixel_number;
 	bitmap_image image(imageWidth, imageHeight);
+
 	for(int i = 0; i < imageWidth; i++){
         for(int j = 0; j < imageHeight; j++){
             image.set_pixel(j, i, 0, 0, 0);
         }
     }	
-	Vector3D topleft;
 	
 	double planeDistance = ((double)windowHeight/2.0) / tan(((fovY*pi)/180)/2.0);
-	topleft.x = position.x + l.x*planeDistance - r.x*(double)windowWidth/2 + u.x*(double)windowHeight/2;
-	topleft.y = position.y + l.y*planeDistance - r.y*(double)windowWidth/2 + u.y*(double)windowHeight/2;
-	topleft.z = position.z + l.z*planeDistance - r.z*(double)windowWidth/2 + u.z*(double)windowHeight/2;
+	// test << "planeDistance: " << planeDistance << endl;
+	Vector3D topleft = position.Add(l.Multiply(planeDistance)).Subtract(r.Multiply((double)windowWidth/2.0)).Add(u.Multiply((double)windowHeight/2.0));; 
+	
+
 	double du = (double)windowWidth/(double)imageWidth;
 	double dv = (double)windowHeight/(double)imageHeight;
 
 	// Choose middle of the grid cell
-	topleft.x = topleft.x + r.x*(0.5*du) - u.x*(0.5*dv);
-	topleft.y = topleft.y + r.y*(0.5*du) - u.y*(0.5*dv);
-	topleft.z = topleft.z + r.y*(0.5*du) - u.z*(0.5*dv);
+	topleft = topleft.Add(r.Multiply(du/2.0)).Subtract(u.Multiply(dv/2.0));
+	
 
 	int nearest = 99999999;
 	double t, tMin = 99999999;
 
+	int flag = 0;
 	for(int i = 0; i < imageWidth; i++){
 		for(int j = 0; j < imageHeight; j++){
-			
-			Vector3D curPixel;
-			curPixel.x = topleft.x + r.x * (i * du) - u.x * (j * dv);
-			curPixel.y = topleft.y + r.y * (i * du) - u.y * (j * dv);
-			curPixel.z = topleft.z + r.z * (i * du) - u.z * (j * dv);
+			// test << "iteration: " << j << endl;
+			Vector3D curPixel = topleft.Add(r.Multiply((double)i*du)).Subtract(u.Multiply((double)j*dv));
+			// test << "curPixel: " << curPixel.x << " " << curPixel.y << " " << curPixel.z << endl;
 
-			Vector3D direction;
-			direction.x = curPixel.x - position.x; direction.y = curPixel.y - position.y; direction.z = curPixel.z - position.z;
-			direction.normalize();
+			Vector3D direction = curPixel.Subtract(position);
+			// test << "dir: " << direction.x << " " << direction.y << " " << direction.z << endl;
+			// direction.normalize();
 			Ray ray(position, direction);
+
+			Color *color = new Color;
+			color->red = 0.0; color->green = 0.0; color->blue = 0.0;
 			
-			Color color;
-			
-			color.red = 0; color.green = 0; color.blue = 0;
-			for(int i = 0; i < no_of_objects; i++){
+			for(int i = 0; i < objects.size(); i++){
 				t = objects[i]->intersect(ray, color, 0);
 				if(t < tMin && t > 0){
 					tMin = t;
 					nearest = i;
 				}
 			}
-			if(nearest < 99999999){
+			
+			if(nearest != 99999999){
 				tMin = objects[nearest]->intersect(ray, color, 1);
-				image.set_pixel(j, i, color.red, color.green, color.blue);
+				// test << color->red << " " << color->green << " " << color->blue << endl;
+				color->clip();
+				image.set_pixel(j, i, round(color->red*255), round(color->green*255), round(color->blue*255));
 			}
+				
 		}
+		
 	}
 	image.save_image("Output_1" + to_string(bitmap_image_count) + ".bmp");
 	cout << "image captured\n";
@@ -287,11 +288,11 @@ void animate(){
 
 void init(){
 	//codes for initialization
-	drawaxes=0;
+	drawaxes=1;
 
     position.x = 100;
 	position.y = 100;
-	position.z = 0;
+	position.z = 50;
 
 	l.x = -1/sqrt(2.0);
 	l.y = -1/sqrt(2.0);
@@ -315,7 +316,7 @@ void init(){
 	glLoadIdentity();
 
 	//give PERSPECTIVE parameters
-	gluPerspective(fovY,	1,	1,	1000.0);
+	gluPerspective(fovY, 1,	1,	500.0);
 }
 
 // ############################################################################################ //
@@ -355,22 +356,22 @@ void LoadData(){
         // read sphere 
         if(object_type == "sphere"){
             double radius; 
-            cin >> position.x >> position.y >> position.z >> radius;
-            object = new Sphere(position, radius);
+            cin >> object_pos.x >> object_pos.y >> object_pos.z >> radius;
+            object = new Sphere(object_pos, radius);
         }
         // read triangle
         else if(object_type == "triangle"){
             Vector3D position2, position3;
-            cin >> position.x >> position.y >> position.z >> position2.x >> position2.y >> position2.z >> position3.x >> position3.y >> position3.z;
-            object = new Triangle(position, position2, position3); 
+            cin >> object_pos.x >> object_pos.y >> object_pos.z >> position2.x >> position2.y >> position2.z >> position3.x >> position3.y >> position3.z;
+            object = new Triangle(object_pos, position2, position3); 
         }
         // read general quad shape
         else if(object_type == "general"){
             QuadraticCoefficients quadcoeff; double height, width, length;
             cin >> quadcoeff.a >> quadcoeff.b >> quadcoeff.c >> quadcoeff.d >> quadcoeff.e >> quadcoeff.f >> quadcoeff.g >> quadcoeff.h >> quadcoeff.i >> quadcoeff.j;
-            cin >> position.x >> position.y >> position.z >> length >> width >> height;
+            cin >> object_pos.x >> object_pos.y >> object_pos.z >> length >> width >> height;
 
-            object = new GeneralQuadraticShape(quadcoeff, position, height, width, length);
+            object = new GeneralQuadraticShape(quadcoeff, object_pos, height, width, length);
         }
 
         cin >> color.red >> color.green >> color.blue;
@@ -387,9 +388,9 @@ void LoadData(){
     cin >> no_of_pointlight;
     PointLight *pointLight;
     for(int i = 0; i < no_of_pointlight; i++){
-        cin >> position.x >> position.y >> position.z;
+        cin >> object_pos.x >> object_pos.y >> object_pos.z;
         cin >> color.red >> color.green >> color.blue;
-        pointLight = new PointLight(position, color);
+        pointLight = new PointLight(object_pos, color);
         pointLights.push_back(pointLight);
     }
     printPointLight();
@@ -398,11 +399,11 @@ void LoadData(){
     cin >> no_of_spotlight;
     SpotLight *spotLight; double cutoff_angle; Vector3D direction;
     for(int i = 0; i < no_of_spotlight; i++){
-        cin >> position.x >> position.y >> position.z;
+        cin >> object_pos.x >> object_pos.y >> object_pos.z;
         cin >> color.red >> color.green >> color.blue;   // color
         cin >> direction.x >> direction.y >> direction.z;  // direction
         cin >> cutoff_angle;    // cutoff angle
-        spotLight = new SpotLight(position, color, direction, cutoff_angle);
+        spotLight = new SpotLight(object_pos, color, direction, cutoff_angle);
         spotLights.push_back(spotLight);
     }
     // Read Floor
@@ -412,6 +413,8 @@ void LoadData(){
     object->setShine(10);
     object->setCoEfficients(coefficient);
     objects.push_back(object);
+
+	cin.clear();
 }
 
 
