@@ -34,17 +34,17 @@ int windowHeight = 500;
 double fovY = 80;
 int bitmap_image_count = 1;
 
-Vector3D Cross_Product(Vector3D u, Vector3D v){
-	Vector3D cross;
-	cross.x = u.y * v.z - u.z * v.y;
-	cross.y = u.z * v.x - u.x * v.z;
-	cross.z = u.x * v.y - u.y * v.x;
+// Vector3D Cross_Product(Vector3D u, Vector3D v){
+// 	Vector3D cross;
+// 	cross.x = u.y * v.z - u.z * v.y;
+// 	cross.y = u.z * v.x - u.x * v.z;
+// 	cross.z = u.x * v.y - u.y * v.x;
 
-	return cross;
-}
+// 	return cross;
+// }
 
 Vector3D Rotation(Vector3D v, Vector3D reference, int dir){
-	Vector3D cross = Cross_Product(v, reference);
+	Vector3D cross = v.Cross_Product(reference);
 	Vector3D new_point;
 
 	double actual_rotation_angle = dir * rotation_angle;
@@ -81,7 +81,7 @@ void Capture(){
 
 	for(int i = 0; i < imageWidth; i++){
         for(int j = 0; j < imageHeight; j++){
-            image.set_pixel(j, i, 0, 0, 0);
+            image.set_pixel(i, j, 0, 0, 0);
         }
     }	
 	
@@ -97,10 +97,8 @@ void Capture(){
 	topleft = topleft.Add(r.Multiply(du/2.0)).Subtract(u.Multiply(dv/2.0));
 	
 
-	int nearest = 99999999;
-	double t, tMin = 99999999;
-
-	int flag = 0;
+	
+	cout << "no of obj: " << objects.size() << endl;
 	for(int i = 0; i < imageWidth; i++){
 		for(int j = 0; j < imageHeight; j++){
 			// test << "iteration: " << j << endl;
@@ -114,10 +112,11 @@ void Capture(){
 
 			Color *color = new Color;
 			color->red = 0.0; color->green = 0.0; color->blue = 0.0;
-			
+			int nearest = 99999999;
+			double t, tMin = 99999999;
 			for(int i = 0; i < objects.size(); i++){
 				t = objects[i]->intersect(ray, color, 0);
-				if(t < tMin && t > 0){
+				if((t > 0.0) && (t < tMin)){
 					tMin = t;
 					nearest = i;
 				}
@@ -127,8 +126,9 @@ void Capture(){
 				tMin = objects[nearest]->intersect(ray, color, 1);
 				// test << color->red << " " << color->green << " " << color->blue << endl;
 				color->clip();
-				image.set_pixel(j, i, round(color->red*255), round(color->green*255), round(color->blue*255));
+				image.set_pixel(i, j, round(color->red*255), round(color->green*255), round(color->blue*255));
 			}
+			test << "i: " << i << " j: " << j << "color: " << color->red << " " << color->green << " " << color->blue << endl;
 				
 		}
 		
@@ -409,9 +409,9 @@ void LoadData(){
     // Read Floor
     Object *object;
     object = new Floor(floor_width, tile_width);
-    object->setColor(color);
     object->setShine(10);
-    object->setCoEfficients(coefficient);
+	Coefficients floor_coefficient = {0.2, 0.2, 0.2, 0.2};
+    object->setCoEfficients(floor_coefficient);
     objects.push_back(object);
 
 	cin.clear();

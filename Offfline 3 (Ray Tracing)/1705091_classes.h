@@ -17,6 +17,12 @@ struct Color{
         blue = 0;
     }
 
+    Color(double r, double g, double b) {
+        red = r;
+        green = g;
+        blue = b;
+    }
+
     void clip(){
         if(this->red > 1) this->red = 1;
         if(this->red < 0) this->red = 0;
@@ -32,7 +38,7 @@ struct Coefficients{
 };
 
 struct QuadraticCoefficients{
-    double a, b, c, d, e, f, g, h, i, j;
+    double A, B, C, D, E, F, G, H, I, J;
 };
 
 class Vector3D{
@@ -95,6 +101,15 @@ public:
         newPoint.y = this->y * value;
         newPoint.z = this->z * value;
         return newPoint;
+    }
+
+    Vector3D Cross_Product(Vector3D v){
+        Vector3D cross;
+        cross.x = this->y * v.z - this->z * v.y;
+        cross.y = this->z * v.x - this->x * v.z;
+        cross.z = this->x * v.y - this->y * v.x;
+
+        return cross;
     }
 
     double dot(Vector3D v){
@@ -271,12 +286,9 @@ public:
         
         // specular
         Vector3D dir =  (ray_normal.direction.Multiply(lightray.direction.dot(ray_normal.direction) * 2)).Subtract(lightray.direction);
-        test << "dir: " << dir.x << " " << dir.y << " " << dir.z << endl;
         Ray reflected_ray = Ray(intersecting_point, dir);
         Vector3D V = ray.direction.Multiply(-1);
-        test << "V: " << V.x << " " << V.y << " " << V.z << endl;
         double phong_value = max(0.0,reflected_ray.direction.dot(V));
-        test<< "phong_value: " << phong_value << endl;
         color->red += pointlight->getColor().red * intersect_point_color.red * coefficient.specular * pow(phong_value, shininess);
         color->green += pointlight->getColor().green * intersect_point_color.green * coefficient.specular * pow(phong_value, shininess);
         color->blue += pointlight->getColor().blue * intersect_point_color.blue * coefficient.specular * pow(phong_value, shininess);
@@ -462,7 +474,6 @@ public:
             }
         }
         
-        // cout << "near: " << nearest << endl;
         if(nearest != 9999999){
             Color *reflected_color = new Color;
             objects[nearest]->intersect(reflected_ray, reflected_color, level + 1);
@@ -481,39 +492,194 @@ public:
 };
 
 class Triangle : public Object{
-    Vector3D v1, v2, v3;
+    
 public:
+    Vector3D a, b, c;
+
     Triangle(){
-        v1 = Vector3D();
-        v2 = Vector3D();
-        v3 = Vector3D();
+        a = Vector3D();
+        b = Vector3D();
+        c = Vector3D();
     }
-    Triangle(Vector3D v1, Vector3D v2, Vector3D v3){
-        this->v1 = v1;
-        this->v2 = v2;
-        this->v3 = v3;
+    Triangle(Vector3D a, Vector3D b, Vector3D c){
+        this->a = a;
+        this->b = b;
+        this->c = c;
     }
-    void setV1(Vector3D v1){
-        this->v1 = v1;
+    void seta(Vector3D a){
+        this->a = a;
     }
-    void setV2(Vector3D v2){
-        this->v2 = v2;
+    void setb(Vector3D b){
+        this->b = b;
     }
-    void setV3(Vector3D v3){
-        this->v3 = v3;
+    void setc(Vector3D c){
+        this->c = c;
     }
 
     void draw(){
         glColor3f(getColor().red, getColor().green, getColor().blue);
         glBegin(GL_TRIANGLES);{
-            glVertex3f(v1.x, v1.y, v1.z);
-            glVertex3f(v2.x, v2.y, v2.z);
-            glVertex3f(v3.x, v3.y, v3.z);
+            glVertex3f(a.x, a.y, a.z);
+            glVertex3f(b.x, b.y, b.z);
+            glVertex3f(c.x, c.y, c.z);
         }glEnd();
     }
 
     double intersect(Ray ray, Color *color, int level){
+        double beta_matrix[3][3], gamma_matrix[3][3], T_matrix[3][1], A_matrix[3][3];
+        double determinantBeta, determinantGamma, determinantA, determinantT;
+        double beta, gamma, T, A;
+         // beta matrix
+        beta_matrix[0][0] = a.x - ray.origin.x;
+        beta_matrix[0][1] = a.y - c.x;
+        beta_matrix[0][2] = ray.direction.x;
+        beta_matrix[1][0] = a.y - ray.origin.y;
+        beta_matrix[1][1] = a.y - c.y;
+        beta_matrix[1][2] = ray.direction.y;
+        beta_matrix[2][0] = a.z - ray.origin.z;
+        beta_matrix[2][1] = a.z - c.z;
+        beta_matrix[2][2] = ray.direction.z;
+
+        // gamma matrix
+        gamma_matrix[0][0] = a.x - b.x;
+        gamma_matrix[0][1] = a.x - ray.origin.x;
+        gamma_matrix[0][2] = ray.direction.x;
+        gamma_matrix[1][0] = a.y - b.y;
+        gamma_matrix[1][1] = a.y - ray.origin.y;
+        gamma_matrix[1][2] = ray.direction.y;
+        gamma_matrix[2][0] = a.z - b.z;
+        gamma_matrix[2][1] = a.z - ray.origin.z;
+        gamma_matrix[2][2] = ray.direction.z;
+
+        // t matrix
+        T_matrix[0][0] = a.x - b.x;
+        T_matrix[0][1] = a.x - c.x;
+        T_matrix[0][2] = a.x - ray.origin.x;
+        T_matrix[1][0] = a.y - b.y;
+        T_matrix[1][1] = a.y - c.y;
+        T_matrix[1][2] = a.y - ray.origin.y;
+        T_matrix[2][0] = a.z - b.z;
+        T_matrix[2][1] = a.z - c.z;
+        T_matrix[2][2] = a.z - ray.origin.z;
+
+        // A matrix
+        A_matrix[0][0] = a.x - b.x;
+        A_matrix[0][1] = a.x - c.x;
+        A_matrix[0][2] = ray.direction.x;
+        A_matrix[1][0] = a.y - b.y;
+        A_matrix[1][1] = a.y - c.y;
+        A_matrix[1][2] = ray.direction.y;
+        A_matrix[2][0] = a.z - b.z;
+        A_matrix[2][1] = a.z - c.z;
+        A_matrix[2][2] = ray.direction.z;
+
+        // Calculating determinant
+        determinantBeta = beta_matrix[0][0] * (beta_matrix[1][1] * beta_matrix[2][2] - beta_matrix[1][2] * beta_matrix[2][1]) - beta_matrix[0][1] * (beta_matrix[1][0] * beta_matrix[2][2] - beta_matrix[1][2] * beta_matrix[2][0]) + beta_matrix[0][2] * (beta_matrix[1][0] * beta_matrix[2][1] - beta_matrix[1][1] * beta_matrix[2][0]);
+        determinantGamma = gamma_matrix[0][0] * (gamma_matrix[1][1] * gamma_matrix[2][2] - gamma_matrix[1][2] * gamma_matrix[2][1]) - gamma_matrix[0][1] * (gamma_matrix[1][0] * gamma_matrix[2][2] - gamma_matrix[1][2] * gamma_matrix[2][0]) + gamma_matrix[0][2] * (gamma_matrix[1][0] * gamma_matrix[2][1] - gamma_matrix[1][1] * gamma_matrix[2][0]);
+        determinantA = A_matrix[0][0] * (A_matrix[1][1] * A_matrix[2][2] - A_matrix[1][2] * A_matrix[2][1]) - A_matrix[0][1] * (A_matrix[1][0] * A_matrix[2][2] - A_matrix[1][2] * A_matrix[2][0]) + A_matrix[0][2] * (A_matrix[1][0] * A_matrix[2][1] - A_matrix[1][1] * A_matrix[2][0]);
+        determinantT = T_matrix[0][0] * (T_matrix[1][1] * T_matrix[2][2] - T_matrix[1][2] * T_matrix[2][1]) - T_matrix[0][1] * (T_matrix[1][0] * T_matrix[2][2] - T_matrix[1][2] * T_matrix[2][0]) + T_matrix[0][2] * (T_matrix[1][0] * T_matrix[2][1] - T_matrix[1][1] * T_matrix[2][0]);
+
+        // Calculating beta, gamma, t, A
+        if(determinantA == 0) return -1;
+
+        beta = determinantBeta / determinantA;
+        gamma = determinantGamma / determinantA;
+        T = determinantT / determinantA;
+        A = determinantA / determinantA;
+
+        double tmin;
+        if(beta + gamma < 1 && beta > 0 && gamma > 0 && T > 0){
+            tmin = T;
+        }
+        else tmin = -1;
+        if(level == 0) {
+            return tmin;
+        }
+
+
+        // Lighting Code according to the phong model //
+        Vector3D intersecting_point = ray.origin.Add(ray.direction.Multiply(tmin));
+        Color intersectpoint_color = getColor();
+
+        color->red = intersectpoint_color.red * getCoEfficients().ambient;
+        color->green = intersectpoint_color.green * getCoEfficients().ambient;
+        color->blue = intersectpoint_color.blue * getCoEfficients().ambient;
+
+        // normal
+        Ray ray_normal;
+        Vector3D intersecting_point_normal = b.Subtract(a).Cross_Product(c.Subtract(a));
+        intersecting_point_normal.normalize();
+        if(((ray.direction.Multiply(-1)).dot(intersecting_point_normal)) > 0){
+            ray_normal.origin = intersecting_point;
+            ray_normal.direction = intersecting_point_normal;
+        }
+        else{
+            ray_normal.origin = intersecting_point;
+            ray_normal.direction = intersecting_point_normal.Multiply(-1);
+        }    
+        
+        for(int i = 0; i < pointLights.size(); i++){
+            // Intersecting point of light ray and object //
+            Vector3D dir = pointLights[i]->getPosition().Subtract(intersecting_point);
+
+            Ray lightray = Ray(pointLights[i]->getPosition(),dir);
+            
+
+            // check if any other object is in the way //
+            double tMinimmum = 99999999, t;
+            for(int j = 0; j < objects.size(); j++){
+                Color *tempcolor = new Color;
+                double t = objects[j]->intersect(lightray, tempcolor, 0);
+
+                if(t > 0 && t < tMinimmum){
+                    tMinimmum = t;
+                }
+            }
+            // get the intersecting point of the light ray and the object //
+            Vector3D min_obj_intersecting_point = lightray.origin.Add(lightray.direction.Multiply(tMinimmum));
+
+            // if intersecting point is in shadow
+            if(min_obj_intersecting_point.computeDistance(lightray.origin) < intersecting_point.computeDistance(lightray.origin)){
+                continue;
+            }
+
+            // Calculate Diffuse and Spcecular lighting //
+            ComputeCoefficients(intersecting_point, lightray, ray_normal, ray, pointLights[i], intersectpoint_color, color);
+        }
+
+        // Reflection //
+        if(level >= recursion_level) return tmin;
+
+        double epsilon = 0.0000001;
+        Vector3D eye_dir =  ray.direction.Subtract(ray_normal.direction.Multiply(ray.direction.dot(ray_normal.direction) * 2));
+        intersecting_point.Add(eye_dir.Multiply(epsilon));
+        Ray reflected_ray = Ray(intersecting_point, eye_dir);
+
+        double t, tMinimum = 99999999;
+        int nearest = 9999999;
+
+        for(int i = 0; i < objects.size(); i++){
+            Color *tempcolor = new Color;
+            t = objects[i]->intersect(reflected_ray, tempcolor, 0);
+            // cout << "t: " << t << endl;
+            if(t > 0 && t < tMinimum){
+                tMinimum = t;
+                nearest = i;
+            }
+        }
+        
+        // cout << "near: " << nearest << endl;
+        if(nearest != 9999999){
+            Color *reflected_color = new Color;
+            objects[nearest]->intersect(reflected_ray, reflected_color, level + 1);
+            color->red += reflected_color->red * getCoEfficients().reflection;
+            color->green += reflected_color->green * getCoEfficients().reflection;
+            color->blue += reflected_color->blue * getCoEfficients().reflection;
+        }
+
+
         return -1.0;
+
     }
 
     ~Triangle(){
@@ -546,6 +712,18 @@ public:
     void draw(){}
 
     double intersect(Ray ray, Color *color, int level){
+        double Aq, Bq, Cq;
+        Aq = quadcoefficients.A * ray.direction.x * ray.direction.x + quadcoefficients.B * ray.direction.y * ray.direction.y + quadcoefficients.C * ray.direction.z * ray.direction.z;
+        Aq += quadcoefficients.D * ray.direction.x * ray.direction.y + quadcoefficients.E * ray.direction.x * ray.direction.z + quadcoefficients.F * ray.direction.y * ray.direction.z;
+
+        Bq = 2 * quadcoefficients.A * ray.direction.x * ray.origin.x + 2 * quadcoefficients.B * ray.direction.y * ray.origin.y + 2 * quadcoefficients.C * ray.direction.z * ray.origin.z;
+        Bq += quadcoefficients.D * (ray.direction.x * ray.origin.y + ray.direction.y * ray.origin.x) + quadcoefficients.E * (ray.direction.x * ray.origin.z + ray.direction.z * ray.origin.x) + quadcoefficients.F * (ray.direction.y * ray.origin.z + ray.direction.z * ray.origin.y);
+        Bq += quadcoefficients.G * ray.direction.x + quadcoefficients.H * ray.direction.y + quadcoefficients.I * ray.direction.z;
+
+        Cq = quadcoefficients.A * ray.origin.x * ray.origin.x + quadcoefficients.B * ray.origin.y * ray.origin.y + quadcoefficients.C * ray.origin.z * ray.origin.z;
+        Cq += quadcoefficients.D * ray.origin.x * ray.origin.y + quadcoefficients.E * ray.origin.x * ray.origin.z + quadcoefficients.F * ray.origin.y * ray.origin.z;
+        Cq += quadcoefficients.G * ray.origin.x + quadcoefficients.H * ray.origin.y + quadcoefficients.I * ray.origin.z;
+        Cq += quadcoefficients.J;
         return -1.0;
     }
 
@@ -583,7 +761,28 @@ public:
         }
     }
 
-    double intersect(Ray ray, Color *color, int level){
+    Color getColorAt(Vector3D intPoint)
+    {
+        // if (intPoint.x < reference_point.x || intPoint.x > -reference_point.x) {
+        //     return Color();
+        // } 
+        
+        // if (intPoint.y < reference_point.y || intPoint.y > -reference_point.y) {
+        //     return Color();
+        // } 
+
+        int row = (intPoint.x)/tile_width;
+        int col = (intPoint.y)/tile_width;
+
+        if ((row + col) % 2 == 0) {
+            return Color(0, 0, 0);
+        }
+        else {
+            return Color(1, 1, 1);
+        }
+    }
+
+    double intersect(Ray ray, Color *color, int level) {
         Vector3D n(0, 0, 1);
         if(n.dot(ray.direction) == 0) return -1.0;
         double tmin = (-1) * (n.dot(ray.origin) / n.dot(ray.direction));
@@ -592,6 +791,77 @@ public:
         Vector3D intersectionPoint = ray.origin.Add(ray.direction.Multiply(tmin));
         if (intersectionPoint.x < reference_point.x || intersectionPoint.x > -reference_point.x) return -1;
         if (intersectionPoint.y < reference_point.y || intersectionPoint.y > -reference_point.y) return -1;
+        if(level == 0)
+            return tmin;
+
+        // Lighting Code according to the phong model //
+
+        Color intersectpoint_color = getColorAt(intersectionPoint);
+        color->red = intersectpoint_color.red * getCoEfficients().ambient;
+        color->green = intersectpoint_color.green * getCoEfficients().ambient;
+        color->blue = intersectpoint_color.blue * getCoEfficients().ambient;
+
+
+        Ray ray_normal = Ray(intersectionPoint, n);
+        
+
+        for(int i = 0; i < pointLights.size(); i++){
+            // Intersecting point of light ray and object //
+            Vector3D dir = pointLights[i]->getPosition().Subtract(intersectionPoint);
+
+            Ray lightray = Ray(pointLights[i]->getPosition(),dir);
+            
+
+            // check if any other object is in the way //
+            double tMinimmum = 99999999, t;
+            for(int j = 0; j < objects.size(); j++){
+                Color *tempcolor = new Color;
+                double t = objects[j]->intersect(lightray, tempcolor, 0);
+
+                if(t > 0 && t < tMinimmum){
+                    tMinimmum = t;
+                }
+            }
+            // get the intersecting point of the light ray and the object //
+            Vector3D min_obj_intersecting_point = lightray.origin.Add(lightray.direction.Multiply(tMinimmum));
+
+            // if intersecting point is in shadow
+            if(min_obj_intersecting_point.computeDistance(lightray.origin) < intersectionPoint.computeDistance(lightray.origin)){
+                continue;
+            }
+
+            // Calculate Diffuse and Spcecular lighting //
+            ComputeCoefficients(intersectionPoint, lightray, ray_normal, ray, pointLights[i], intersectpoint_color, color);
+        }
+
+        // Reflection //
+        if(level >= recursion_level) return tmin;
+
+        double epsilon = 0.0000001;
+        Vector3D eye_dir =  ray.direction.Subtract(ray_normal.direction.Multiply(ray.direction.dot(ray_normal.direction) * 2));
+        intersectionPoint.Add(eye_dir.Multiply(epsilon));
+        Ray reflected_ray = Ray(intersectionPoint, eye_dir);
+
+        double t, tMinimum = 99999999;
+        int nearest = 9999999;
+
+        for(int i = 0; i < objects.size(); i++){
+            Color *tempcolor = new Color;
+            t = objects[i]->intersect(reflected_ray, tempcolor, 0);
+            if(t > 0 && t < tMinimum){
+                tMinimum = t;
+                nearest = i;
+            }
+        }
+
+        if(nearest != 9999999){
+            Color *reflected_color = new Color;
+            objects[nearest]->intersect(reflected_ray, reflected_color, level + 1);
+            color->red += reflected_color->red * getCoEfficients().reflection;
+            color->green += reflected_color->green * getCoEfficients().reflection;
+            color->blue += reflected_color->blue * getCoEfficients().reflection;
+        }
+
         return tmin;
     }
 };
