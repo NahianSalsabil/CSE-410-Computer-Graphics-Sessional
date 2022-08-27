@@ -1,7 +1,10 @@
 #include<bits/stdc++.h>
 #include <GL/glut.h>
 
+
 using namespace std;
+
+#define epsilon 0.0000001
 
 #define pi (2*acos(0.0))
 
@@ -172,11 +175,13 @@ public:
         return this->color;
     }
     void draw(){
+        // glPushMatrix();
         glColor3f(color.red, color.green, color.blue);
         glPointSize(5);
         glBegin(GL_POINTS);
         glVertex3f(position.x, position.y, position.z);
         glEnd();
+        // glPopMatrix();
     }
     ~PointLight(){
 
@@ -184,10 +189,12 @@ public:
 };
 
 class SpotLight{
+    
+public:
     Vector3D position; Color color;
     Vector3D direction;
     double cutoff_angle;
-public:
+    
     SpotLight(){
         position = Vector3D();
         direction = Vector3D();
@@ -286,8 +293,9 @@ public:
         
         // specular
         Vector3D dir =  (ray_normal.direction.Multiply(lightray.direction.dot(ray_normal.direction) * 2)).Subtract(lightray.direction);
-        Ray reflected_ray = Ray(intersecting_point, dir);
-        Vector3D V = ray.direction.Multiply(-1);
+        dir.normalize();
+        Ray reflected_ray = Ray(intersecting_point.Add(dir.Multiply(epsilon)), dir);
+        Vector3D V = ray.direction.Multiply(-1.0);
         double phong_value = max(0.0,reflected_ray.direction.dot(V));
         color->red += pointlight->getColor().red * intersect_point_color.red * coefficient.specular * pow(phong_value, shininess);
         color->green += pointlight->getColor().green * intersect_point_color.green * coefficient.specular * pow(phong_value, shininess);
@@ -453,13 +461,53 @@ public:
             ComputeCoefficients(intersecting_point, lightray, ray_normal, ray, pointLights[i], intersectpoint_color, color);
         }
 
+        // ############# SPOTLIGHT ############## //
+
+        for(int i = 0; i < spotLights.size(); i++){
+            // Intersecting point of light ray and object //
+            Vector3D dir = spotLights[i]->getPosition().Subtract(intersecting_point);
+
+            Ray lightray = Ray(spotLights[i]->getPosition(),dir);
+
+            Vector3D spotlight_dir = spotLights[i]->getDirection();
+            spotlight_dir.normalize();
+
+            double cos_theta = spotlight_dir.dot(lightray.direction);
+            double theta = acos(cos_theta) * 180 / pi;
+            
+            if(theta > spotLights[i]->cutoff_angle){
+                continue;
+            }
+            // check if any other object is in the way //
+            double tMinimmum = 99999999, t;
+            for(int j = 0; j < objects.size(); j++){
+                Color *tempcolor = new Color;
+                double t = objects[j]->intersect(lightray, tempcolor, 0);
+
+                if(t > 0 && t < tMinimmum){
+                    tMinimmum = t;
+                }
+            }
+            // get the intersecting point of the light ray and the object //
+            Vector3D min_obj_intersecting_point = lightray.origin.Add(lightray.direction.Multiply(tMinimmum));
+
+            // if intersecting point is in shadow
+            if(min_obj_intersecting_point.computeDistance(lightray.origin) < intersecting_point.computeDistance(lightray.origin)){
+                continue;
+            }
+
+            // Calculate Diffuse and Spcecular lighting //
+            ComputeCoefficients(intersecting_point, lightray, ray_normal, ray, pointLights[i], intersectpoint_color, color);
+        }
+
         // Reflection //
         if(level >= recursion_level) return tmin;
 
-        double epsilon = 0.0000001;
+        
         Vector3D eye_dir =  ray.direction.Subtract(ray_normal.direction.Multiply(ray.direction.dot(ray_normal.direction) * 2));
-        intersecting_point.Add(eye_dir.Multiply(epsilon));
-        Ray reflected_ray = Ray(intersecting_point, eye_dir);
+        eye_dir.normalize();
+        // intersecting_point.Add(eye_dir.Multiply(epsilon));
+        Ray reflected_ray = Ray(intersecting_point.Add(eye_dir.Multiply(epsilon)), eye_dir);
 
         double t, tMinimum = 99999999;
         int nearest = 9999999;
@@ -468,22 +516,21 @@ public:
             Color *tempcolor = new Color;
             t = objects[i]->intersect(reflected_ray, tempcolor, 0);
             // cout << "t: " << t << endl;
-            if(t > 0 && t < tMinimum){
+            if(t > 0.0 && t < tMinimum){
                 tMinimum = t;
                 nearest = i;
             }
         }
         
         if(nearest != 9999999){
-            Color *reflected_color = new Color;
+            Color *reflected_color = new Color();
             objects[nearest]->intersect(reflected_ray, reflected_color, level + 1);
-            test << "ref: " << getCoEfficients().reflection << endl;
             color->red += reflected_color->red * getCoEfficients().reflection;
             color->green += reflected_color->green * getCoEfficients().reflection;
             color->blue += reflected_color->blue * getCoEfficients().reflection;
         }
 
-        return -1.0;
+        return tmin;
     }
 
     ~Sphere(){
@@ -517,21 +564,32 @@ public:
     }
 
     void draw(){
+        // glPushMatrix();
         glColor3f(getColor().red, getColor().green, getColor().blue);
         glBegin(GL_TRIANGLES);{
             glVertex3f(a.x, a.y, a.z);
             glVertex3f(b.x, b.y, b.z);
             glVertex3f(c.x, c.y, c.z);
         }glEnd();
+        // glPopMatrix();
+    }
+
+    double determinantCalc(double matrix[][3]){
+        return matrix[0][0] * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1]) - matrix[0][1] * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0]) + matrix[0][2] * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0]);
+    }
+
+    void print(double det){
+        test << "det: " << det << endl;
     }
 
     double intersect(Ray ray, Color *color, int level){
-        double beta_matrix[3][3], gamma_matrix[3][3], T_matrix[3][1], A_matrix[3][3];
+
+        double beta_matrix[3][3], gamma_matrix[3][3], T_matrix[3][3], A_matrix[3][3];
         double determinantBeta, determinantGamma, determinantA, determinantT;
         double beta, gamma, T, A;
          // beta matrix
         beta_matrix[0][0] = a.x - ray.origin.x;
-        beta_matrix[0][1] = a.y - c.x;
+        beta_matrix[0][1] = a.x - c.x;
         beta_matrix[0][2] = ray.direction.x;
         beta_matrix[1][0] = a.y - ray.origin.y;
         beta_matrix[1][1] = a.y - c.y;
@@ -574,13 +632,22 @@ public:
         A_matrix[2][2] = ray.direction.z;
 
         // Calculating determinant
+        // determinantBeta = determinantCalc(beta_matrix);
+        // determinantA = determinantCalc(A_matrix);
+        // determinantGamma = determinantCalc(gamma_matrix);
+        // determinantT = determinantCalc(T_matrix);
+
+        // int count = 0;
+        // if(count == 0)
+        //     print(determinantBeta);
+
         determinantBeta = beta_matrix[0][0] * (beta_matrix[1][1] * beta_matrix[2][2] - beta_matrix[1][2] * beta_matrix[2][1]) - beta_matrix[0][1] * (beta_matrix[1][0] * beta_matrix[2][2] - beta_matrix[1][2] * beta_matrix[2][0]) + beta_matrix[0][2] * (beta_matrix[1][0] * beta_matrix[2][1] - beta_matrix[1][1] * beta_matrix[2][0]);
         determinantGamma = gamma_matrix[0][0] * (gamma_matrix[1][1] * gamma_matrix[2][2] - gamma_matrix[1][2] * gamma_matrix[2][1]) - gamma_matrix[0][1] * (gamma_matrix[1][0] * gamma_matrix[2][2] - gamma_matrix[1][2] * gamma_matrix[2][0]) + gamma_matrix[0][2] * (gamma_matrix[1][0] * gamma_matrix[2][1] - gamma_matrix[1][1] * gamma_matrix[2][0]);
         determinantA = A_matrix[0][0] * (A_matrix[1][1] * A_matrix[2][2] - A_matrix[1][2] * A_matrix[2][1]) - A_matrix[0][1] * (A_matrix[1][0] * A_matrix[2][2] - A_matrix[1][2] * A_matrix[2][0]) + A_matrix[0][2] * (A_matrix[1][0] * A_matrix[2][1] - A_matrix[1][1] * A_matrix[2][0]);
         determinantT = T_matrix[0][0] * (T_matrix[1][1] * T_matrix[2][2] - T_matrix[1][2] * T_matrix[2][1]) - T_matrix[0][1] * (T_matrix[1][0] * T_matrix[2][2] - T_matrix[1][2] * T_matrix[2][0]) + T_matrix[0][2] * (T_matrix[1][0] * T_matrix[2][1] - T_matrix[1][1] * T_matrix[2][0]);
 
         // Calculating beta, gamma, t, A
-        if(determinantA == 0) return -1;
+        if(determinantA > -epsilon && determinantA < epsilon) return -1;
 
         beta = determinantBeta / determinantA;
         gamma = determinantGamma / determinantA;
@@ -600,6 +667,7 @@ public:
         // Lighting Code according to the phong model //
         Vector3D intersecting_point = ray.origin.Add(ray.direction.Multiply(tmin));
         Color intersectpoint_color = getColor();
+        test << " triangle color " <<  intersectpoint_color.red << " " <<  intersectpoint_color.green << " " << intersectpoint_color.blue << endl;
 
         color->red = intersectpoint_color.red * getCoEfficients().ambient;
         color->green = intersectpoint_color.green * getCoEfficients().ambient;
@@ -631,7 +699,46 @@ public:
                 Color *tempcolor = new Color;
                 double t = objects[j]->intersect(lightray, tempcolor, 0);
 
-                if(t > 0 && t < tMinimmum){
+                if(t > 0.0 && t < tMinimmum){
+                    tMinimmum = t;
+                }
+            }
+            // get the intersecting point of the light ray and the object //
+            Vector3D min_obj_intersecting_point = lightray.origin.Add(lightray.direction.Multiply(tMinimmum));
+
+            // if intersecting point is in shadow
+            if(min_obj_intersecting_point.computeDistance(lightray.origin) < intersecting_point.computeDistance(lightray.origin)){
+                continue;
+            }
+
+            // Calculate Diffuse and Spcecular lighting //
+            ComputeCoefficients(intersecting_point, lightray, ray_normal, ray, pointLights[i], intersectpoint_color, color);
+        }
+
+        // ############# SPOTLIGHT ############## //
+
+        for(int i = 0; i < spotLights.size(); i++){
+            // Intersecting point of light ray and object //
+            Vector3D dir = spotLights[i]->getPosition().Subtract(intersecting_point);
+
+            Ray lightray = Ray(spotLights[i]->getPosition(),dir);
+
+            Vector3D spotlight_dir = spotLights[i]->getDirection();
+            spotlight_dir.normalize();
+
+            double cos_theta = spotlight_dir.dot(lightray.direction);
+            double theta = acos(cos_theta) * 180 / pi;
+            
+            if(theta > spotLights[i]->cutoff_angle){
+                continue;
+            }
+            // check if any other object is in the way //
+            double tMinimmum = 99999999, t;
+            for(int j = 0; j < objects.size(); j++){
+                Color *tempcolor = new Color;
+                double t = objects[j]->intersect(lightray, tempcolor, 0);
+
+                if(t > 0.0 && t < tMinimmum){
                     tMinimmum = t;
                 }
             }
@@ -650,10 +757,11 @@ public:
         // Reflection //
         if(level >= recursion_level) return tmin;
 
-        double epsilon = 0.0000001;
+        
         Vector3D eye_dir =  ray.direction.Subtract(ray_normal.direction.Multiply(ray.direction.dot(ray_normal.direction) * 2));
-        intersecting_point.Add(eye_dir.Multiply(epsilon));
-        Ray reflected_ray = Ray(intersecting_point, eye_dir);
+        // intersecting_point.Add(eye_dir.Multiply(epsilon));
+        eye_dir.normalize();
+        Ray reflected_ray = Ray(intersecting_point.Add(eye_dir.Multiply(epsilon)), eye_dir);
 
         double t, tMinimum = 99999999;
         int nearest = 9999999;
@@ -662,7 +770,7 @@ public:
             Color *tempcolor = new Color;
             t = objects[i]->intersect(reflected_ray, tempcolor, 0);
             // cout << "t: " << t << endl;
-            if(t > 0 && t < tMinimum){
+            if(t > 0.0 && t < tMinimum){
                 tMinimum = t;
                 nearest = i;
             }
@@ -678,7 +786,7 @@ public:
         }
 
 
-        return -1.0;
+        return tmin;
 
     }
 
@@ -712,7 +820,7 @@ public:
     void draw(){}
 
     double intersect(Ray ray, Color *color, int level){
-        double Aq, Bq, Cq;
+        double Aq, Bq, Cq, tmin, t0, t1;
         Aq = quadcoefficients.A * ray.direction.x * ray.direction.x + quadcoefficients.B * ray.direction.y * ray.direction.y + quadcoefficients.C * ray.direction.z * ray.direction.z;
         Aq += quadcoefficients.D * ray.direction.x * ray.direction.y + quadcoefficients.E * ray.direction.x * ray.direction.z + quadcoefficients.F * ray.direction.y * ray.direction.z;
 
@@ -724,7 +832,202 @@ public:
         Cq += quadcoefficients.D * ray.origin.x * ray.origin.y + quadcoefficients.E * ray.origin.x * ray.origin.z + quadcoefficients.F * ray.origin.y * ray.origin.z;
         Cq += quadcoefficients.G * ray.origin.x + quadcoefficients.H * ray.origin.y + quadcoefficients.I * ray.origin.z;
         Cq += quadcoefficients.J;
-        return -1.0;
+
+        if(fabs(Aq) < 0.00000000001){
+            tmin = -Cq/Bq;
+        }
+        else{
+            double discriminant = Bq*Bq - 4.0*Aq*Cq;
+            // test << "discriminant: " << discriminant << endl;
+            if(discriminant < 0.0){
+                return -1.0;
+            }
+            else{
+                t0 = (-Bq - sqrt(discriminant))/(2*Aq);
+                t1 = (-Bq + sqrt(discriminant))/(2*Aq);
+                if(t0 > 0){
+                    Vector3D p0 = ray.origin.Add(ray.direction.Multiply(t0));
+                    int var = 0;
+                    if(cube_length != 0){
+                        if(p0.x < cube_reference_point.x || p0.x > cube_reference_point.x + cube_width){
+                            var +=1;
+                        } 
+                    }
+                    if(cube_width !=0){
+                        if(p0.y < cube_reference_point.y || p0.y > cube_reference_point.y + cube_width){
+                            var +=1;
+                        }
+                    }
+                    if(cube_height != 0){
+                        if(p0.z < cube_reference_point.z || p0.z > cube_reference_point.z + cube_height){
+                            var +=1;
+                        }
+                    }
+                    if(var != 0){
+                        t0 = -1;
+                    }
+                } 
+                if(t1 > 0){
+                    if(t1 > 0){
+                        Vector3D p1 = ray.origin.Add(ray.direction.Multiply(t1));
+                        int var = 0;
+                        if(cube_length != 0){
+                            if(p1.x < cube_reference_point.x || p1.x > cube_reference_point.x + cube_width){
+                                var +=1;
+                            } 
+                        }
+                        if(cube_width !=0){
+                            if(p1.y < cube_reference_point.y || p1.y > cube_reference_point.y + cube_width){
+                                var +=1;
+                            }
+                        }
+                        if(cube_height != 0){
+                            if(p1.z < cube_reference_point.z || p1.z > cube_reference_point.z + cube_height){
+                                var +=1;
+                            }
+                        }
+                        if(var != 0){
+                            t1 = -1;
+                        }
+                    } 
+                }
+                if(t0 > 0 && t1 > 0){
+                    if(t0 < t1){
+                        tmin = t0;
+                    }
+                    else{
+                        tmin = t1;
+                    }
+                }
+                else if(t0 > 0){
+                    tmin = t0;
+                }
+                else if(t1 > 0){
+                    tmin = t1;
+                }
+                else{
+                    return -1.0;
+                }
+            }
+        }
+        if(level == 0)
+            return tmin;
+
+        // Lighting Code according to the phong model //
+        
+        Vector3D intersecting_point = ray.origin.Add(ray.direction.Multiply(tmin));
+        Color intersectpoint_color = getColor();
+
+        color->red = intersectpoint_color.red * getCoEfficients().ambient;
+        color->green = intersectpoint_color.green * getCoEfficients().ambient;
+        color->blue = intersectpoint_color.blue * getCoEfficients().ambient;
+
+        Vector3D intersecting_point_normal;
+        intersecting_point_normal.x = 2 * quadcoefficients.A * intersecting_point.x + quadcoefficients.D * intersecting_point.y + quadcoefficients.E * intersecting_point.z + quadcoefficients.G;
+        intersecting_point_normal.y = 2 * quadcoefficients.B * intersecting_point.y + quadcoefficients.D * intersecting_point.x + quadcoefficients.F * intersecting_point.z + quadcoefficients.H;
+        intersecting_point_normal.z = 2 * quadcoefficients.C * intersecting_point.z + quadcoefficients.E * intersecting_point.x + quadcoefficients.F * intersecting_point.y + quadcoefficients.I;
+        Ray ray_normal = Ray(intersecting_point, intersecting_point_normal);
+        
+
+        for(int i = 0; i < pointLights.size(); i++){
+            // Intersecting point of light ray and object //
+            Vector3D dir = pointLights[i]->getPosition().Subtract(intersecting_point);
+
+            Ray lightray = Ray(pointLights[i]->getPosition(),dir);
+            
+
+            // check if any other object is in the way //
+            double tMinimmum = 99999999, t;
+            for(int j = 0; j < objects.size(); j++){
+                Color *tempcolor = new Color;
+                double t = objects[j]->intersect(lightray, tempcolor, 0);
+
+                if(t > 0.0 && t < tMinimmum){
+                    tMinimmum = t;
+                }
+            }
+            // get the intersecting point of the light ray and the object //
+            Vector3D min_obj_intersecting_point = lightray.origin.Add(lightray.direction.Multiply(tMinimmum));
+
+            // if intersecting point is in shadow
+            if(min_obj_intersecting_point.computeDistance(lightray.origin) < intersecting_point.computeDistance(lightray.origin)){
+                continue;
+            }
+
+            // Calculate Diffuse and Spcecular lighting //
+            ComputeCoefficients(intersecting_point, lightray, ray_normal, ray, pointLights[i], intersectpoint_color, color);
+        }
+
+        // ############# SPOTLIGHT ############## //
+
+        for(int i = 0; i < spotLights.size(); i++){
+            // Intersecting point of light ray and object //
+            Vector3D dir = spotLights[i]->getPosition().Subtract(intersecting_point);
+
+            Ray lightray = Ray(spotLights[i]->getPosition(),dir);
+
+            Vector3D spotlight_dir = spotLights[i]->getDirection();
+            spotlight_dir.normalize();
+
+            double cos_theta = spotlight_dir.dot(lightray.direction);
+            double theta = acos(cos_theta) * 180 / pi;
+            
+            if(theta > spotLights[i]->cutoff_angle){
+                continue;
+            }
+            // check if any other object is in the way //
+            double tMinimmum = 99999999, t;
+            for(int j = 0; j < objects.size(); j++){
+                Color *tempcolor = new Color;
+                double t = objects[j]->intersect(lightray, tempcolor, 0);
+
+                if(t > 0.0 && t < tMinimmum){
+                    tMinimmum = t;
+                }
+            }
+            // get the intersecting point of the light ray and the object //
+            Vector3D min_obj_intersecting_point = lightray.origin.Add(lightray.direction.Multiply(tMinimmum));
+
+            // if intersecting point is in shadow
+            if(min_obj_intersecting_point.computeDistance(lightray.origin) < intersecting_point.computeDistance(lightray.origin)){
+                continue;
+            }
+
+            // Calculate Diffuse and Spcecular lighting //
+            ComputeCoefficients(intersecting_point, lightray, ray_normal, ray, pointLights[i], intersectpoint_color, color);
+        }
+
+        // Reflection //
+        if(level >= recursion_level) return tmin;
+
+        
+        Vector3D eye_dir =  ray.direction.Subtract(ray_normal.direction.Multiply(ray.direction.dot(ray_normal.direction) * 2));
+        // intersecting_point.Add(eye_dir.Multiply(epsilon));
+        eye_dir.normalize();
+        Ray reflected_ray = Ray(intersecting_point.Add(eye_dir.Multiply(epsilon)), eye_dir);
+
+        double t, tMinimum = 99999999;
+        int nearest = 9999999;
+
+        for(int i = 0; i < objects.size(); i++){
+            Color *tempcolor = new Color;
+            t = objects[i]->intersect(reflected_ray, tempcolor, 0);
+            if(t > 0.0 && t < tMinimum){
+                tMinimum = t;
+                nearest = i;
+            }
+        }
+        
+        if(nearest != 9999999){
+            Color *reflected_color = new Color;
+            objects[nearest]->intersect(reflected_ray, reflected_color, level + 1);
+            color->red += reflected_color->red * getCoEfficients().reflection;
+            color->green += reflected_color->green * getCoEfficients().reflection;
+            color->blue += reflected_color->blue * getCoEfficients().reflection;
+        }
+        
+
+        return tmin;
     }
 
     ~GeneralQuadraticShape(){
@@ -743,6 +1046,7 @@ public:
     }
 
     void draw(){
+        // glPushMatrix();
         for( int i = -floor_width/(2*tile_width); i < floor_width/(2*tile_width); i++){
             for( int j = -floor_width/(2*tile_width); j < floor_width/(2*tile_width); j++){
                 if((i+j)%2 == 0){
@@ -759,29 +1063,27 @@ public:
                 }glEnd();
             }
         }
+        // glPopMatrix();
     }
 
     Color getColorAt(Vector3D intPoint)
     {
-        // if (intPoint.x < reference_point.x || intPoint.x > -reference_point.x) {
-        //     return Color();
-        // } 
-        
-        // if (intPoint.y < reference_point.y || intPoint.y > -reference_point.y) {
-        //     return Color();
-        // } 
+        int row = floor((intPoint.x + 250)/tile_width);
+        int col = floor((intPoint.y + 250)/tile_width);
 
-        int row = (intPoint.x)/tile_width;
-        int col = (intPoint.y)/tile_width;
-
-        if ((row + col) % 2 == 0) {
-            return Color(0, 0, 0);
+        if(row % 2 == 0){
+            if(col % 2 == 0)
+                return Color(0.0, 0.0, 0.0);
+            else
+                return Color(1.0, 1.0, 1.0);
         }
-        else {
-            return Color(1, 1, 1);
+        else{
+            if(col % 2 == 0)
+                return Color(1.0, 1.0, 1.0);
+            else 
+                return Color(0.0, 0.0, 0.0);
         }
     }
-
     double intersect(Ray ray, Color *color, int level) {
         Vector3D n(0, 0, 1);
         if(n.dot(ray.direction) == 0) return -1.0;
@@ -818,7 +1120,57 @@ public:
                 Color *tempcolor = new Color;
                 double t = objects[j]->intersect(lightray, tempcolor, 0);
 
-                if(t > 0 && t < tMinimmum){
+                if(t > 0.0 && t < tMinimmum){
+                    tMinimmum = t;
+                }
+            }
+            // get the intersecting point of the light ray and the object //
+            Vector3D min_obj_intersecting_point = lightray.origin.Add(lightray.direction.Multiply(tMinimmum));
+
+            // if intersecting point is in shadow
+            if(min_obj_intersecting_point.computeDistance(lightray.origin) < intersectionPoint.computeDistance(lightray.origin)){
+                continue;
+            }
+
+            // Calculate Diffuse and Spcecular lighting //
+            ComputeCoefficients(intersectionPoint, lightray, ray_normal, ray, pointLights[i], intersectpoint_color, color);
+        }
+
+        // ############# SPOTLIGHT ############## //
+        int count = 0;
+
+        for(int i = 0; i < spotLights.size(); i++){
+            // Intersecting point of light ray and object //
+            Vector3D dir = spotLights[i]->getPosition().Subtract(intersectionPoint);
+            Vector3D dir_temp = intersectionPoint.Subtract(spotLights[i]->getPosition());
+            dir_temp.normalize();
+            
+            dir.normalize();
+
+            Vector3D spotlight_dir = spotLights[i]->getDirection();
+            spotlight_dir.normalize();
+
+            double cos_theta = spotlight_dir.dot(dir_temp);
+            double theta = acos(cos_theta) * 180 / pi;
+
+            // dir.Multiply(-1);
+
+            //  v this
+            Vector3D lightPos = intersectionPoint.Add(dir.Multiply(0.00000001));
+            Ray lightray(lightPos, dir);
+
+            test << "angle: " << theta << endl;
+            
+            if(theta > spotLights[i]->cutoff_angle){
+                continue;
+            }
+            // check if any other object is in the way //
+            double tMinimmum = 99999999, t;
+            for(int j = 0; j < objects.size(); j++){
+                Color *tempcolor = new Color;
+                double t = objects[j]->intersect(lightray, tempcolor, 0);
+
+                if(t > 0.0 && t < tMinimmum){
                     tMinimmum = t;
                 }
             }
@@ -837,10 +1189,11 @@ public:
         // Reflection //
         if(level >= recursion_level) return tmin;
 
-        double epsilon = 0.0000001;
+        
         Vector3D eye_dir =  ray.direction.Subtract(ray_normal.direction.Multiply(ray.direction.dot(ray_normal.direction) * 2));
-        intersectionPoint.Add(eye_dir.Multiply(epsilon));
-        Ray reflected_ray = Ray(intersectionPoint, eye_dir);
+        // intersectionPoint.Add(eye_dir.Multiply(epsilon));
+        eye_dir.normalize();
+        Ray reflected_ray = Ray(intersectionPoint.Add(eye_dir.Multiply(epsilon)), eye_dir);
 
         double t, tMinimum = 99999999;
         int nearest = 9999999;
@@ -848,7 +1201,7 @@ public:
         for(int i = 0; i < objects.size(); i++){
             Color *tempcolor = new Color;
             t = objects[i]->intersect(reflected_ray, tempcolor, 0);
-            if(t > 0 && t < tMinimum){
+            if(t > 0.0 && t < tMinimum){
                 tMinimum = t;
                 nearest = i;
             }

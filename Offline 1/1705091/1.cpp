@@ -435,37 +435,37 @@ void keyboardListener(unsigned char key, int x,int y){
 
 void specialKeyListener(int key, int x,int y){
 	switch(key){
-		case GLUT_KEY_DOWN:		//down arrow key
+		case GLUT_KEY_DOWN:		//down arrow key, zoom out
 			pos.x -= l.x;
 			pos.y -= l.y;
 			pos.z -= l.z;
 			break;
 
-		case GLUT_KEY_UP:		// up arrow key
+		case GLUT_KEY_UP:		// up arrow key, zoom in
 			pos.x += l.x;
 			pos.y += l.y;
 			pos.z += l.z;
 			break;
 
-		case GLUT_KEY_RIGHT:   // right arrow
+		case GLUT_KEY_RIGHT:   // right arrow, move right
 			pos.x += r.x;
 			pos.y += r.y;
 			pos.z += r.z;
 			break;
 
-		case GLUT_KEY_LEFT:    // left arrow
+		case GLUT_KEY_LEFT:    // left arrow, move left
 			pos.x -= r.x;
 			pos.y -= r.y;
 			pos.z -= r.z;
 			break;
 
-		case GLUT_KEY_PAGE_UP:  // page up
+		case GLUT_KEY_PAGE_UP:  // page up, move up
 			pos.x += u.x;
 			pos.y += u.y;
 			pos.z += u.z;
 			break;
 
-		case GLUT_KEY_PAGE_DOWN:   // page down
+		case GLUT_KEY_PAGE_DOWN:   // page down, move down
 			pos.x -= u.x;
 			pos.y -= u.y;
 			pos.z -= u.z;

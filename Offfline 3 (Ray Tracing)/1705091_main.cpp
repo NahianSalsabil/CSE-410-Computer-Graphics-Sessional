@@ -110,25 +110,28 @@ void Capture(){
 			// direction.normalize();
 			Ray ray(position, direction);
 
-			Color *color = new Color;
-			color->red = 0.0; color->green = 0.0; color->blue = 0.0;
+			
 			int nearest = 99999999;
 			double t, tMin = 99999999;
 			for(int i = 0; i < objects.size(); i++){
+				Color *color = new Color;
+				color->red = 0.0; color->green = 0.0; color->blue = 0.0;
 				t = objects[i]->intersect(ray, color, 0);
 				if((t > 0.0) && (t < tMin)){
 					tMin = t;
 					nearest = i;
 				}
+
 			}
 			
 			if(nearest != 99999999){
+				Color *color = new Color;
+				color->red = 0.0; color->green = 0.0; color->blue = 0.0;
 				tMin = objects[nearest]->intersect(ray, color, 1);
 				// test << color->red << " " << color->green << " " << color->blue << endl;
 				color->clip();
 				image.set_pixel(i, j, round(color->red*255), round(color->green*255), round(color->blue*255));
 			}
-			test << "i: " << i << " j: " << j << "color: " << color->red << " " << color->green << " " << color->blue << endl;
 				
 		}
 		
@@ -187,6 +190,7 @@ void specialKeyListener(int key, int x,int y){
 			position.x -= l.x;
 			position.y -= l.y;
 			position.z -= l.z;
+			cout << position.x << " " << position.y << " " << position.z << endl;
 			break;
 
 		case GLUT_KEY_UP:		// up arrow key
@@ -292,7 +296,7 @@ void init(){
 
     position.x = 100;
 	position.y = 100;
-	position.z = 50;
+	position.z = -50;
 
 	l.x = -1/sqrt(2.0);
 	l.y = -1/sqrt(2.0);
@@ -359,16 +363,16 @@ void LoadData(){
             cin >> object_pos.x >> object_pos.y >> object_pos.z >> radius;
             object = new Sphere(object_pos, radius);
         }
-        // read triangle
+        //read triangle
         else if(object_type == "triangle"){
             Vector3D position2, position3;
             cin >> object_pos.x >> object_pos.y >> object_pos.z >> position2.x >> position2.y >> position2.z >> position3.x >> position3.y >> position3.z;
-            object = new Triangle(object_pos, position2, position3); 
+            object = new Triangle (object_pos, position2, position3); 
         }
         // read general quad shape
         else if(object_type == "general"){
             QuadraticCoefficients quadcoeff; double height, width, length;
-            cin >> quadcoeff.a >> quadcoeff.b >> quadcoeff.c >> quadcoeff.d >> quadcoeff.e >> quadcoeff.f >> quadcoeff.g >> quadcoeff.h >> quadcoeff.i >> quadcoeff.j;
+            cin >> quadcoeff.A >> quadcoeff.B >> quadcoeff.C >> quadcoeff.D >> quadcoeff.E >> quadcoeff.F >> quadcoeff.G >> quadcoeff.H >> quadcoeff.I >> quadcoeff.J;
             cin >> object_pos.x >> object_pos.y >> object_pos.z >> length >> width >> height;
 
             object = new GeneralQuadraticShape(quadcoeff, object_pos, height, width, length);
@@ -440,5 +444,22 @@ int main(int argc, char** argv){
 	LoadData();
 
 	glutMainLoop();		//The main loop of OpenGL
+
+
+	// Memory Management
+	for(int i = 0; i < objects.size(); i++){
+		delete objects[i];
+	}
+	vector<Object*> ().swap(objects);
+
+	for(int i = 0; i < pointLights.size(); i++){
+		delete pointLights[i];
+	}
+	vector<PointLight*> ().swap(pointLights);
+
+	for(int i = 0; i < spotLights.size(); i++){
+		delete spotLights[i];
+	}
+	vector<SpotLight*> ().swap(spotLights);
     
 }
