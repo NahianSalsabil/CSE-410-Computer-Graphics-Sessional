@@ -837,9 +837,9 @@ public:
             tmin = -Cq/Bq;
         }
         else{
-            double discriminant = Bq*Bq - 4*Aq*Cq;
+            double discriminant = Bq*Bq - 4.0*Aq*Cq;
             // test << "discriminant: " << discriminant << endl;
-            if(discriminant < 0){
+            if(discriminant < 0.0){
                 return -1.0;
             }
             else{

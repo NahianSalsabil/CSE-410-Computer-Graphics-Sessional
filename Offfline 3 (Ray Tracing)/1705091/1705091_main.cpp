@@ -110,11 +110,12 @@ void Capture(){
 			// direction.normalize();
 			Ray ray(position, direction);
 
-			Color *color = new Color;
-			color->red = 0.0; color->green = 0.0; color->blue = 0.0;
+			
 			int nearest = 99999999;
 			double t, tMin = 99999999;
 			for(int i = 0; i < objects.size(); i++){
+				Color *color = new Color;
+				color->red = 0.0; color->green = 0.0; color->blue = 0.0;
 				t = objects[i]->intersect(ray, color, 0);
 				if((t > 0.0) && (t < tMin)){
 					tMin = t;
@@ -124,6 +125,8 @@ void Capture(){
 			}
 			
 			if(nearest != 99999999){
+				Color *color = new Color;
+				color->red = 0.0; color->green = 0.0; color->blue = 0.0;
 				tMin = objects[nearest]->intersect(ray, color, 1);
 				// test << color->red << " " << color->green << " " << color->blue << endl;
 				color->clip();
@@ -360,11 +363,11 @@ void LoadData(){
             cin >> object_pos.x >> object_pos.y >> object_pos.z >> radius;
             object = new Sphere(object_pos, radius);
         }
-        // read triangle
+        //read triangle
         else if(object_type == "triangle"){
             Vector3D position2, position3;
             cin >> object_pos.x >> object_pos.y >> object_pos.z >> position2.x >> position2.y >> position2.z >> position3.x >> position3.y >> position3.z;
-            object = new Triangle(object_pos, position2, position3); 
+            object = new Triangle (object_pos, position2, position3); 
         }
         // read general quad shape
         else if(object_type == "general"){
